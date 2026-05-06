@@ -38,6 +38,12 @@ function App() {
   const [batch, setBatch] = useState('');
   const [authError, setAuthError] = useState('');
   const [userName, setUserName] = useState('');
+  const [userRole, setUserRole] = useState('');
+  const [homeAddress, setHomeAddress] = useState('');
+  const [currentAddress, setCurrentAddress] = useState('');
+  const [mobileNo, setMobileNo] = useState('');
+  const [college, setCollege] = useState('');
+  const [school, setSchool] = useState('');
 
   const tabs = [
     { key: 'files', label: 'Uploaded Files' },
@@ -51,9 +57,35 @@ function App() {
   useEffect(() => {
     onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      if (currentUser) fetchFiles();
+      if (currentUser) {
+        fetchFiles();
+        fetchUserProfile(currentUser.uid);
+      }
     });
   }, []);
+
+  // Fetch user profile data from Firestore
+  const fetchUserProfile = async (uid) => {
+    try {
+      const userDoc = await getDocs(collection(db, 'users'));
+      const userData = userDoc.docs.find(doc => doc.id === uid);
+      if (userData) {
+        const data = userData.data();
+        setUserRole(data.role || '');
+        setDiscipline(data.discipline || '');
+        setStudentId(data.studentId || '');
+        setBatch(data.batch || '');
+        setHomeAddress(data.homeAddress || '');
+        setCurrentAddress(data.currentAddress || '');
+        setMobileNo(data.mobileNo || '');
+        setCollege(data.college || '');
+        setSchool(data.school || '');
+        setUserBio(data.bio || '');
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
 
   // 2. Login/Logout Functions
   const handleLogin = () => signInWithPopup(auth, googleProvider);
@@ -158,9 +190,28 @@ function App() {
     }
   };
 
-  const handleSaveProfile = () => {
-    setIsEditingProfile(false);
-    setIsViewingProfile(false);
+  const handleSaveProfile = async () => {
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        displayName: user.displayName,
+        email: user.email,
+        role: userRole,
+        discipline,
+        studentId: userRole === 'student' ? studentId : '',
+        batch: userRole === 'student' ? batch : '',
+        homeAddress,
+        currentAddress,
+        mobileNo,
+        college: userRole === 'student' ? college : '',
+        school: userRole === 'student' ? school : '',
+        bio: userBio,
+        updatedAt: new Date()
+      }, { merge: true });
+      setIsEditingProfile(false);
+      setIsViewingProfile(false);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+    }
   };
 
   const handleConfirmLogout = async () => {
@@ -325,7 +376,7 @@ function App() {
             <div className="logo-section">
               <img className="header-logo" src="/khulna-university.png" alt="KU Logo" />
               <div className="logo-text">
-                <h1>KU CSE26 Portal</h1>
+                <h1><a href="/" style={{ color: 'inherit', textDecoration: 'none' }}>KU CSE26 Portal</a></h1>
                 <p>Khulna University Computer Science & Engineering Discipline</p>
               </div>
             </div>
@@ -442,7 +493,7 @@ function App() {
                   {isViewingProfile ? (
                     <div className="profile-view-section">
                       <div className="section-header">
-                        <h2>👁️ View Profile</h2>
+                        <h2>👤 Profile</h2>
                         <p className="section-desc">Your profile information.</p>
                       </div>
 
@@ -464,6 +515,55 @@ function App() {
                           <div className="form-group">
                             <label>Email</label>
                             <p>{user.email}</p>
+                          </div>
+
+                          <div className="form-group">
+                            <label>Role</label>
+                            <p>{userRole === 'student' ? 'Student' : userRole === 'teacher' ? 'Teacher' : 'Not specified'}</p>
+                          </div>
+
+                          <div className="form-group">
+                            <label>Discipline</label>
+                            <p>{discipline || 'Not specified'}</p>
+                          </div>
+
+                          {userRole === 'student' && (
+                            <>
+                              <div className="form-group">
+                                <label>Student ID</label>
+                                <p>{studentId || 'Not specified'}</p>
+                              </div>
+
+                              <div className="form-group">
+                                <label>Batch</label>
+                                <p>{batch || 'Not specified'}</p>
+                              </div>
+
+                              <div className="form-group">
+                                <label>College</label>
+                                <p>{college || 'Not specified'}</p>
+                              </div>
+
+                              <div className="form-group">
+                                <label>School</label>
+                                <p>{school || 'Not specified'}</p>
+                              </div>
+                            </>
+                          )}
+
+                          <div className="form-group">
+                            <label>Home Address</label>
+                            <p>{homeAddress || 'Not specified'}</p>
+                          </div>
+
+                          <div className="form-group">
+                            <label>Current Address</label>
+                            <p>{currentAddress || 'Not specified'}</p>
+                          </div>
+
+                          <div className="form-group">
+                            <label>Mobile No.</label>
+                            <p>{mobileNo || 'Not specified'}</p>
                           </div>
 
                           <div className="form-group">
@@ -516,6 +616,99 @@ function App() {
                           <div className="form-group">
                             <label>Email</label>
                             <input type="email" value={user.email || ''} disabled />
+                          </div>
+
+                          <div className="form-group">
+                            <label>Role</label>
+                            <select value={userRole} onChange={(e) => setUserRole(e.target.value)}>
+                              <option value="">Select Role</option>
+                              <option value="student">Student</option>
+                              <option value="teacher">Teacher</option>
+                            </select>
+                          </div>
+
+                          <div className="form-group">
+                            <label>Discipline</label>
+                            <input 
+                              type="text" 
+                              value={discipline} 
+                              onChange={(e) => setDiscipline(e.target.value)} 
+                              placeholder="Enter your discipline"
+                            />
+                          </div>
+
+                          {userRole === 'student' && (
+                            <>
+                              <div className="form-group">
+                                <label>Student ID</label>
+                                <input 
+                                  type="text" 
+                                  value={studentId} 
+                                  onChange={(e) => setStudentId(e.target.value)} 
+                                  placeholder="Enter your student ID"
+                                />
+                              </div>
+
+                              <div className="form-group">
+                                <label>Batch</label>
+                                <input 
+                                  type="text" 
+                                  value={batch} 
+                                  onChange={(e) => setBatch(e.target.value)} 
+                                  placeholder="Enter your batch"
+                                />
+                              </div>
+
+                              <div className="form-group">
+                                <label>College</label>
+                                <input 
+                                  type="text" 
+                                  value={college} 
+                                  onChange={(e) => setCollege(e.target.value)} 
+                                  placeholder="Enter your college name"
+                                />
+                              </div>
+
+                              <div className="form-group">
+                                <label>School</label>
+                                <input 
+                                  type="text" 
+                                  value={school} 
+                                  onChange={(e) => setSchool(e.target.value)} 
+                                  placeholder="Enter your school name"
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          <div className="form-group">
+                            <label>Home Address</label>
+                            <textarea
+                              value={homeAddress}
+                              onChange={(e) => setHomeAddress(e.target.value)}
+                              placeholder="Enter your home address"
+                              rows="3"
+                            ></textarea>
+                          </div>
+
+                          <div className="form-group">
+                            <label>Current Address</label>
+                            <textarea
+                              value={currentAddress}
+                              onChange={(e) => setCurrentAddress(e.target.value)}
+                              placeholder="Enter your current address"
+                              rows="3"
+                            ></textarea>
+                          </div>
+
+                          <div className="form-group">
+                            <label>Mobile No.</label>
+                            <input 
+                              type="tel" 
+                              value={mobileNo} 
+                              onChange={(e) => setMobileNo(e.target.value)} 
+                              placeholder="Enter your mobile number"
+                            />
                           </div>
 
                           <div className="form-group">
