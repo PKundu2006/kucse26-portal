@@ -287,11 +287,11 @@
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  padding: 5px;
 }
 
 .form-group label {
-  color: #cbd5e1;
+  color: #3fcb5f;
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -325,7 +325,7 @@
 }
 
 .profile-actions button {
-  flex: 1;
+  flex: none;
 }
 
 .btn-save-file,
@@ -487,7 +487,7 @@
   border: 1px solid rgba(14, 165, 233, 0.2);
   border-radius: 1rem;
   padding: 3rem 2rem;
-  max-width: 500px;
+  max-width: 60%;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
 }
 
@@ -505,6 +505,112 @@
   margin-bottom: 2rem;
   font-size: 1rem;
   line-height: 1.6;
+}
+
+.email-auth {
+  margin-bottom: 2rem;
+}
+
+.auth-toggle {
+  display: flex;
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid rgba(100, 116, 139, 0.5);
+}
+
+.auth-toggle button {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border: none;
+  background: rgba(100, 116, 139, 0.2);
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.auth-toggle button.active {
+  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  color: white;
+}
+
+.auth-toggle button:hover {
+  background: rgba(100, 116, 139, 0.3);
+}
+
+.sign-up-type-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.sign-up-type-tabs button {
+  flex: 1;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid rgba(100, 116, 139, 0.5);
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.7);
+  color: #cbd5e1;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sign-up-type-tabs button.active,
+.sign-up-type-tabs button:hover {
+  background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+  color: white;
+  border-color: transparent;
+}
+
+.email-auth input {
+  width: 100%;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(100, 116, 139, 0.5);
+  border-radius: 0.5rem;
+  background: rgba(15, 23, 42, 0.5);
+  color: #e2e8f0;
+  font-size: 1rem;
+}
+
+.email-auth input:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+}
+
+.auth-error {
+  color: #ff6b6b;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.auth-divider {
+  margin: 1rem 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  position: relative;
+}
+
+.auth-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(100, 116, 139, 0.5);
+}
+
+.auth-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 41, 59, 0.8);
+  padding: 0 1rem;
 }
 
 .icon-large {

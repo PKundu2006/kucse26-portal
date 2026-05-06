@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { auth, googleProvider, db, storage } from './firebase-config';
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, setDoc } from 'firebase/firestore';
 import './App.css';
 
 function App() {
@@ -27,7 +27,17 @@ function App() {
   const [userBio, setUserBio] = useState('');
   const [savedItems, setSavedItems] = useState([]);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isViewingProfile, setIsViewingProfile] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [signUpType, setSignUpType] = useState('student');
+  const [discipline, setDiscipline] = useState('');
+  const [studentId, setStudentId] = useState('');
+  const [batch, setBatch] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [userName, setUserName] = useState('');
 
   const tabs = [
     { key: 'files', label: 'Uploaded Files' },
@@ -48,6 +58,34 @@ function App() {
   // 2. Login/Logout Functions
   const handleLogin = () => signInWithPopup(auth, googleProvider);
   const handleLogout = () => signOut(auth);
+
+  const handleEmailSignIn = async () => {
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      setAuthError('');
+    } catch (error) {
+      setAuthError(error.message);
+    }
+  };
+
+  const handleEmailSignUp = async () => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(userCredential.user, { displayName: userName });
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        displayName: userName,
+        email,
+        role: signUpType,
+        discipline,
+        studentId: signUpType === 'student' ? studentId : '',
+        batch: signUpType === 'student' ? batch : '',
+        createdAt: new Date()
+      });
+      setAuthError('');
+    } catch (error) {
+      setAuthError(error.message);
+    }
+  };
 
   // 3. Fetch list of uploaded files from Database
   const fetchFiles = async () => {
@@ -122,7 +160,7 @@ function App() {
 
   const handleSaveProfile = () => {
     setIsEditingProfile(false);
-    setProfileOpen(false);
+    setIsViewingProfile(false);
   };
 
   const handleConfirmLogout = async () => {
@@ -151,7 +189,131 @@ function App() {
           <div className="auth-card">
             <img className="portal-logo" src="/khulna-university.png" alt="KU Logo" />
             <h2>KU CSE26 Portal</h2>
-            <p>Secure file upload and management for Computer Science & Engineering</p>
+            <p>Secure file upload and management for Khulna University Computer Science & Engineering Discipline</p>
+            
+            <div className="email-auth">
+              <div className="auth-toggle">
+                <button 
+                  className={!isSignUp ? 'active' : ''} 
+                  onClick={() => {
+                    setIsSignUp(false);
+                    setEmail('');
+                    setPassword('');
+                    setUserName('');
+                    setDiscipline('');
+                    setStudentId('');
+                    setBatch('');
+                    setAuthError('');
+                  }}
+                >
+                  Sign In
+                </button>
+                <button 
+                  className={isSignUp ? 'active' : ''} 
+                  onClick={() => {
+                    setIsSignUp(true);
+                    setEmail('');
+                    setPassword('');
+                    setUserName('');
+                    setDiscipline('');
+                    setStudentId('');
+                    setBatch('');
+                    setAuthError('');
+                  }}
+                >
+                  Sign Up
+                </button>
+              </div>
+              
+              {isSignUp && (
+                <>
+                  <input 
+                    type="text" 
+                    placeholder="Full Name (real name is recommended)" 
+                    value={userName} 
+                    onChange={(e) => setUserName(e.target.value)} 
+                  />
+                </>
+              )}
+              <input 
+                type="email" 
+                placeholder="Email" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+              />
+              <input 
+                type="password" 
+                placeholder="Password" 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+              />
+              {isSignUp && (
+                <>
+                  <div className="sign-up-type-tabs">
+                    <button
+                      className={signUpType === 'student' ? 'active' : ''}
+                      onClick={() => {
+                        setSignUpType('student');
+                        setDiscipline('');
+                        setStudentId('');
+                        setBatch('');
+                      }}
+                    >
+                      Student
+                    </button>
+                    <button
+                      className={signUpType === 'teacher' ? 'active' : ''}
+                      onClick={() => {
+                        setSignUpType('teacher');
+                        setDiscipline('');
+                        setStudentId('');
+                        setBatch('');
+                      }}
+                    >
+                      Teacher
+                    </button>
+                  </div>
+
+                  <input 
+                    type="text" 
+                    placeholder="Discipline" 
+                    value={discipline} 
+                    onChange={(e) => setDiscipline(e.target.value)} 
+                  />
+
+                  {signUpType === 'student' && (
+                    <>
+                      <input 
+                        type="text" 
+                        placeholder="Student ID" 
+                        value={studentId} 
+                        onChange={(e) => setStudentId(e.target.value)} 
+                      />
+                      <input 
+                        type="text" 
+                        placeholder="Batch" 
+                        value={batch} 
+                        onChange={(e) => setBatch(e.target.value)} 
+                      />
+                    </>
+                  )}
+                </>
+              )}
+              
+              
+              
+              {authError && <p className="auth-error">{authError}</p>}
+              
+              <button 
+                className="btn btn-secondary" 
+                onClick={isSignUp ? handleEmailSignUp : handleEmailSignIn}
+              >
+                {isSignUp ? 'Sign Up' : 'Sign In'}
+              </button>
+            </div>
+            
+            <div className="auth-divider">or</div>
+            
             <button className="btn btn-primary" onClick={handleLogin}>
               Sign in with Google
             </button>
@@ -175,7 +337,10 @@ function App() {
               <div className="tab-menu">
                 <button
                   className="more-sign"
-                  onClick={() => setMenuOpen((open) => !open)}
+                  onClick={() => {
+                    setMenuOpen((open) => !open);
+                    setProfileOpen(false);
+                  }}
                   aria-label="Toggle menu"
                 >
                   <span />
@@ -190,6 +355,8 @@ function App() {
                       onClick={() => {
                         setActiveTab(tab.key);
                         setMenuOpen(false);
+                        setIsViewingProfile(false);
+                        setIsEditingProfile(false);
                       }}
                     >
                       {tab.label}
@@ -200,7 +367,10 @@ function App() {
               <div className="profile-menu">
                 <button
                   className="profile-button"
-                  onClick={() => setProfileOpen((open) => !open)}
+                  onClick={() => {
+                    setProfileOpen((open) => !open);
+                    setMenuOpen(false);
+                  }}
                   aria-label="Open profile menu"
                 >
                   <div className="profile-picture">
@@ -215,15 +385,21 @@ function App() {
                   <button
                     className="profile-option"
                     onClick={() => {
-                      setIsEditingProfile(false);
-                      setProfileOpen(true);
+                      setIsViewingProfile(true);
+                      setProfileOpen(false);
+                      setMenuOpen(false);
                     }}
                   >
                     👁️ View Profile
                   </button>
                   <button
                     className="profile-option"
-                    onClick={() => setIsEditingProfile(true)}
+                    onClick={() => {
+                      setIsEditingProfile(true);
+                      setIsViewingProfile(false);
+                      setProfileOpen(false);
+                      setMenuOpen(false);
+                    }}
                   >
                     ✏️ Edit Profile
                   </button>
@@ -231,7 +407,8 @@ function App() {
                   <button
                     className="profile-option logout-option"
                     onClick={() =>{
-                      setShowLogoutConfirm(true)
+                      setShowLogoutConfirm(true);
+                      setProfileOpen(false);
                     }}
                   >
                     🚪 Log Out
@@ -260,65 +437,109 @@ function App() {
 
           <div className="main-container">
             <div className="dashboard">
-              {isEditingProfile ? (
-                <div className="profile-edit-section">
-                  <div className="section-header">
-                    <h2>✏️ Edit Profile</h2>
-                    <p className="section-desc">Update your profile information and picture.</p>
-                  </div>
-
-                  <div className="edit-profile-card">
-                    <div className="profile-picture-upload">
-                      <div className="profile-picture-large">
-                        {profilePicture ? (
-                          <img src={profilePicture} alt="Profile" />
-                        ) : (
-                          <span>📷</span>
-                        )}
-                      </div>
-                      <label htmlFor="profile-pic-input" className="upload-label">
-                        Change Picture
-                      </label>
-                      <input
-                        id="profile-pic-input"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleProfilePictureUpload}
-                        style={{ display: 'none' }}
-                      />
-                    </div>
-
-                    <div className="profile-form">
-                      <div className="form-group">
-                        <label>Display Name</label>
-                        <input type="text" value={user.displayName || ''} disabled />
+              {isEditingProfile || isViewingProfile ? (
+                <div className="profile-section">
+                  {isViewingProfile ? (
+                    <div className="profile-view-section">
+                      <div className="section-header">
+                        <h2>👁️ View Profile</h2>
+                        <p className="section-desc">Your profile information.</p>
                       </div>
 
-                      <div className="form-group">
-                        <label>Email</label>
-                        <input type="email" value={user.email || ''} disabled />
-                      </div>
+                      <div className="view-profile-card">
+                        <div className="profile-picture-large">
+                          {profilePicture ? (
+                            <img src={profilePicture} alt="Profile" />
+                          ) : (
+                            <span>👤</span>
+                          )}
+                        </div>
 
-                      <div className="form-group">
-                        <label>Bio</label>
-                        <textarea
-                          value={userBio}
-                          onChange={(e) => setUserBio(e.target.value)}
-                          placeholder="Tell us about yourself..."
-                          rows="4"
-                        ></textarea>
-                      </div>
+                        <div className="profile-info">
+                          <div className="form-group">
+                            <label>Display Name</label>
+                            <p>{user.displayName}</p>
+                          </div>
 
-                      <div className="profile-actions">
-                        <button className="btn btn-primary" onClick={handleSaveProfile}>
-                          Save Changes
-                        </button>
-                        <button className="btn btn-secondary" onClick={() => setIsEditingProfile(false)}>
-                          Cancel
-                        </button>
+                          <div className="form-group">
+                            <label>Email</label>
+                            <p>{user.email}</p>
+                          </div>
+
+                          <div className="form-group">
+                            <label>Bio</label>
+                            <p>{userBio || 'No bio added yet.'}</p>
+                          </div>
+                        </div>
+
+                        <div className="profile-actions">
+                          <button className="btn btn-primary" onClick={() => setIsViewingProfile(false)}>
+                            Close
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="profile-edit-section">
+                      <div className="section-header">
+                        <h2>✏️ Edit Profile</h2>
+                        <p className="section-desc">Update your profile information and picture.</p>
+                      </div>
+
+                      <div className="edit-profile-card">
+                        <div className="profile-picture-upload">
+                          <div className="profile-picture-large">
+                            {profilePicture ? (
+                              <img src={profilePicture} alt="Profile" />
+                            ) : (
+                              <span>📷</span>
+                            )}
+                          </div>
+                          <label htmlFor="profile-pic-input" className="upload-label">
+                            Change Picture
+                          </label>
+                          <input
+                            id="profile-pic-input"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleProfilePictureUpload}
+                            style={{ display: 'none' }}
+                          />
+                        </div>
+
+                        <div className="profile-form">
+                          <div className="form-group">
+                            <label>Display Name</label>
+                            <input type="text" value={user.displayName || ''} disabled />
+                          </div>
+
+                          <div className="form-group">
+                            <label>Email</label>
+                            <input type="email" value={user.email || ''} disabled />
+                          </div>
+
+                          <div className="form-group">
+                            <label>Bio</label>
+                            <textarea
+                              value={userBio}
+                              onChange={(e) => setUserBio(e.target.value)}
+                              placeholder="Tell us about yourself..."
+                              rows="4"
+                            ></textarea>
+                          </div>
+
+                          <div className="profile-actions">
+                            <button className="btn btn-primary" onClick={handleSaveProfile}>
+                              Save Changes
+                            </button>
+                            <button className="btn btn-secondary" onClick={() => setIsEditingProfile(false)}>
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="tab-content">
