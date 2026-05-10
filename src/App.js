@@ -2,10 +2,10 @@
 // It handles Login, File Selection, and Uploading to the cloud.
 
 import React, { useState, useEffect } from 'react';
-import { auth, googleProvider, db, storage } from './firebase-config';
+import { auth, googleProvider, db } from './firebase-config';
 import { signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, getDocs, doc, setDoc } from 'firebase/firestore';
+//import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, addDoc, getDocs, getDoc, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import './App.css';
 
 function App() {
@@ -24,6 +24,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profilePicture, setProfilePicture] = useState(null);
+  const [profilePictureFile, setProfilePictureFile] = useState(null);
   const [userBio, setUserBio] = useState('');
   const [savedItems, setSavedItems] = useState([]);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -59,18 +60,18 @@ function App() {
       setUser(currentUser);
       if (currentUser) {
         fetchFiles();
-        fetchUserProfile(currentUser.uid);
+        fetchUserProfile(currentUser);
       }
     });
   }, []);
 
   // Fetch user profile data from Firestore
-  const fetchUserProfile = async (uid) => {
+  const fetchUserProfile = async (currentUser) => {
     try {
-      const userDoc = await getDocs(collection(db, 'users'));
-      const userData = userDoc.docs.find(doc => doc.id === uid);
-      if (userData) {
-        const data = userData.data();
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        const data = userDocSnap.data();
         setUserRole(data.role || '');
         setDiscipline(data.discipline || '');
         setStudentId(data.studentId || '');
@@ -81,6 +82,9 @@ function App() {
         setCollege(data.college || '');
         setSchool(data.school || '');
         setUserBio(data.bio || '');
+        setProfilePicture(data.photoURL || currentUser.photoURL || null);
+      } else {
+        setProfilePicture(currentUser.photoURL || null);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -121,11 +125,18 @@ function App() {
 
   // 3. Fetch list of uploaded files from Database
   const fetchFiles = async () => {
-    const querySnapshot = await getDocs(collection(db, 'files'));
-    const files = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    setFileList(files);
+    try {
+      const querySnapshot = await getDocs(collection(db, 'files'));
+      const files = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log('Fetched files:', files); // Debug log
+      setFileList(files);
+    } catch (error) {
+      console.error('Error fetching files from Firestore:', error);
+      setMessage({ type: 'error', text: 'Failed to load files. Check Firestore permissions.' });
+    }
   };
 
+  /*
   // 4. Upload Function
   const handleUpload = async () => {
     if (!file) {
@@ -162,6 +173,100 @@ function App() {
     }
     setUploading(false);
   };
+  
+
+  // 4. New Cloudinary Upload Function
+  const handleUpload = () => {
+    // This opens the Cloudinary window
+    const myWidget = window.cloudinary.createUploadWidget({
+      cloudName: 'dntoc3iad', // Replace with your Cloudinary Cloud Name
+      uploadPreset: 'ml_default' // Replace with your Unsigned Preset
+    }, async (error, result) => { 
+      if (!error && result && result.event === "success") { 
+        setUploading(true);
+        const url = result.info.secure_url;
+        const fileName = result.info.original_filename;
+
+        try {
+          // Save the Cloudinary link to your existing Firebase Firestore
+          await addDoc(collection(db, 'files'), {
+            fileName: fileName,
+            fileUrl: url,
+            uploadedBy: user.displayName,
+            visibility,
+            timestamp: new Date()
+          });
+
+          setMessage({ type: 'success', text: 'Cloudinary Upload successful! 🚀' });
+          fetchFiles(); // This refreshes your list on the screen
+          setTimeout(() => setMessage(''), 3000);
+        } catch (dbError) {
+          console.error("Database error:", dbError);
+          setMessage({ type: 'error', text: 'Saved to Cloudinary, but failed to link to Firebase.' });
+        }
+        setUploading(false);
+      }
+    });
+
+    myWidget.open();
+  };
+  */
+ // 4. Background Cloudinary Upload (Stays in your UI)
+  const handleUpload = async () => {
+    if (!file) {
+      setMessage({ type: 'error', text: 'Please select a file first!' });
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    setUploading(true);
+    setMessage('');
+
+    // Prepare the data to send to Cloudinary
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'ml_default'); // <--- Put your preset name here
+
+    try {
+      // 1. Send file to Cloudinary via their API
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/dntoc3iad/auto/upload`, // <--- Put your Cloud Name here
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.secure_url) {
+        // 2. Save the resulting link to Firebase Firestore
+        const fileData = {
+          fileName: file.name,
+          fileUrl: data.secure_url,
+          uploadedBy: user.displayName || user.email,
+          visibility: visibility || 'public',
+          timestamp: new Date()
+        };
+        console.log('Saving file data to Firestore:', fileData); // Debug log
+        await addDoc(collection(db, 'files'), fileData);
+
+        setMessage({ type: 'success', text: 'Upload successful! 🚀' });
+        setFile(null);
+        setVisibility('public');
+        await fetchFiles(); // Refresh the list on your UI
+      } else {
+        throw new Error('Cloudinary upload failed');
+      }
+
+    } catch (error) {
+      console.error("Upload error:", error);
+      setMessage({ type: 'error', text: 'Upload failed. Check your Cloud Name/Preset.' });
+    } finally {
+      setUploading(false);
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -176,7 +281,12 @@ function App() {
 
   const visibleFiles = fileList.filter((f) => {
     const fileVisibility = f.visibility || 'public';
-    return fileVisibility === 'public' || f.uploadedBy === user.displayName;
+    const isPublic = fileVisibility === 'public';
+    const isUserFile = f.uploadedBy === (user?.displayName || user?.email);
+    if (!isPublic && !isUserFile) {
+      console.warn(`Filtering out file: ${f.fileName}, visibility: ${fileVisibility}, uploadedBy: ${f.uploadedBy}, currentUser: ${user?.displayName}`);
+    }
+    return isPublic || isUserFile;
   });
 
   const handleProfilePictureUpload = (e) => {
@@ -185,6 +295,7 @@ function App() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfilePicture(reader.result);
+        setProfilePictureFile(file);
       };
       reader.readAsDataURL(file);
     }
@@ -192,9 +303,39 @@ function App() {
 
   const handleSaveProfile = async () => {
     try {
+      let photoURL = user.photoURL || profilePicture || '';
+      const currentUser = auth.currentUser || user;
+
+      if (profilePictureFile) {
+        const formData = new FormData();
+        formData.append('file', profilePictureFile);
+        formData.append('upload_preset', 'ml_default');
+
+        const response = await fetch(
+          'https://api.cloudinary.com/v1_1/dntoc3iad/auto/upload',
+          {
+            method: 'POST',
+            body: formData,
+          }
+        );
+
+        const data = await response.json();
+        if (!data.secure_url) {
+          throw new Error('Profile picture upload failed');
+        }
+
+        photoURL = data.secure_url;
+        setProfilePicture(photoURL);
+      }
+
+      if (photoURL && currentUser) {
+        await updateProfile(currentUser, { photoURL });
+      }
+
       await setDoc(doc(db, 'users', user.uid), {
         displayName: user.displayName,
         email: user.email,
+        photoURL,
         role: userRole,
         discipline,
         studentId: userRole === 'student' ? studentId : '',
@@ -207,10 +348,19 @@ function App() {
         bio: userBio,
         updatedAt: new Date()
       }, { merge: true });
-      setIsEditingProfile(false);
-      setIsViewingProfile(false);
+
+      setUser((prevUser) => prevUser ? { ...prevUser, photoURL } : prevUser);
+      setProfilePictureFile(null);
+      setMessage({ type: 'success', text: 'Profile updated successfully.' });
+      setTimeout(() => {
+        setIsEditingProfile(false);
+        setIsViewingProfile(false);
+        setMessage('');
+      }, 1500);
     } catch (error) {
       console.error('Error saving profile:', error);
+      setMessage({ type: 'error', text: 'Failed to save profile. Check console for details.' });
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
@@ -226,6 +376,38 @@ function App() {
       if (file) {
         setSavedItems((prev) => [...prev, file]);
       }
+    }
+  };
+
+  const handleDeleteFile = async (fileId) => {
+    const fileToDelete = fileList.find((file) => file.id === fileId);
+    const currentUserIdentifier = user?.displayName || user?.email;
+    const isUploader = fileToDelete && fileToDelete.uploadedBy === currentUserIdentifier;
+
+    if (!fileToDelete) {
+      setMessage({ type: 'error', text: 'Selected file not found.' });
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    if (!isUploader) {
+      setMessage({ type: 'error', text: 'Only the uploader can delete this file.' });
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    const confirmed = window.confirm('Delete this file from the portal? This cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      await deleteDoc(doc(db, 'files', fileId));
+      setFileList((prev) => prev.filter((file) => file.id !== fileId));
+      setMessage({ type: 'success', text: 'File deleted successfully.' });
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      setMessage({ type: 'error', text: 'Unable to delete file. Please try again.' });
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
@@ -468,6 +650,12 @@ function App() {
               </div>
             </div>
           </header>
+
+          {message && (
+            <div className={`status status-${message.type}`} style={{ margin: '1rem auto', maxWidth: '640px', textAlign: 'center' }}>
+              {message.text}
+            </div>
+          )}
 
           {showLogoutConfirm && (
             <div className="modal-overlay" onClick={() => setShowLogoutConfirm(false)}>
@@ -764,7 +952,7 @@ function App() {
                               </div>
                               <div className="file-actions">
                                 <a href={f.fileUrl} target="_blank" rel="noreferrer">
-                                  Download
+                                  View
                                 </a>
                                 <button
                                   className="btn-save-file"
@@ -773,6 +961,15 @@ function App() {
                                 >
                                   ⭐ Save
                                 </button>
+                                {(f.uploadedBy === user?.displayName || f.uploadedBy === user?.email) && (
+                                  <button
+                                    className="btn-delete-file"
+                                    onClick={() => handleDeleteFile(f.id)}
+                                    title="Delete file"
+                                  >
+                                    🗑️ Delete
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
@@ -790,12 +987,6 @@ function App() {
                         Upload any file to the portal. Choose whether it should be public or private.
                       </p>
                     </div>
-
-                    {message && (
-                      <div className={`status status-${message.type}`}>
-                        {message.text}
-                      </div>
-                    )}
 
                     <div className="file-input-wrapper">
                       <label className="file-input-label">
@@ -956,7 +1147,7 @@ function App() {
                             </div>
                             <div className="file-actions">
                               <a href={f.fileUrl} target="_blank" rel="noreferrer">
-                                Download
+                                View
                               </a>
                               <button
                                 className="btn-remove-save"
